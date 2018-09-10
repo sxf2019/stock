@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html style="height: 100%;width: 100%;">
+
+<head>
+    <meta charset="utf-8" />
+    <title></title>
+    <script type="text/javascript" src="http://echarts.baidu.com/dist/echarts.js"></script>
+    <script type="text/javascript" src="http://libs.baidu.com/jquery/1.4.4/jquery.min.js"></script>
+</head>
+
+<body style="margin:0;padding: 0;">
+    <!--<div class="test">asfd</div>-->
+    <div id="main" style="width:100%;height: 100%;">
+        </di>
+
+</body>
+<script>
+    window.console = window.console || {};
+    console.log || (console.log = opera.postError);
+    var worldMapContainer = document.getElementById('main');
+
+    var loaded = false;
+
+    //用于使chart自适应高度和宽度,通过窗体高宽计算容器高宽
+    var resizeWorldMapContainer = function () {
+        worldMapContainer.style.width = window.innerWidth + 'px';
+        worldMapContainer.style.height = window.innerHeight + 'px';
+    };
+    //设置容器高宽
+    resizeWorldMapContainer();
+    // 基于准备好的dom，初始化echarts实例
+    var myChart = echarts.init(worldMapContainer);
+    //初始化数据
+    var data0 = {
+        categoryData: [
+            [""]
+        ],
+        values: [
+            ["", "", "", ""]
+        ]
+    };
+    //MA5的方法
+    function calculateMA(dayCount) {
+        var result = [];
+        for (var i = 0, len = data0.values.length; i < len; i++) {
+            if (i < dayCount) {
+                result.push('-');
+                continue;
+            }
+            var sum = 0;
+            for (var j = 0; j < dayCount; j++) {
+                sum += data0.values[i - j][1];
+            }
+            result.push(sum / dayCount);
+        }
+        //console.log(result);
+        return result;
+
+    }
+    var maIData = [];//存下来的ma的集合
+    //计算md的方法
+    function getMd() {
+        var lateData;//最后我需要的数据
+        var data = data0.values;//全部的值
+        var mdData = [];
+        var result = calculateMA(26);//MA的值
+        for (var i = 0; i < data.length; i++) {
+            if (i < 26) {
+                mdData.push('-');
+            } else {
+                var nowData = data[i];//当前的值
+                var close = nowData[1];//当前close的点
+                //var sum = sum + ((close - result[i]) * (close - result[i]));
+                var resultData1;
+                var data1 = [];//close的集合
+                for (var j = i - 25; j <= i; j++) {
+                    var sum = 0;
+                    data1.push(data[j]);
+                    //              	var resultData = result[j];
+                    //              	var resultData1.push(resultData);
+                    //              	data
+                    //               var sum = sum +	((nowData[j]-result[i])*(nowData[j]-result[i]))
+                }
+                //              console.log(data1);
+                for (var k = 0; k < data1.length; k++) {
+                    var data1i = data1[k];
+                    sum = sum + ((data1i[1] - result[i]) * (data1i[1] - result[i]));
+
+                }
+                mdData.push(Math.sqrt(sum / 25));
+            }
+        }
+        console.log(mdData);
+        return mdData;
+
+    }
+    //计算up的点
+    var upData = [];
+    function setUp() {
+        var mdData = getMd();
+        var maData = calculateMA(26);
+        upData = [];
+        for (var i = 0; i < mdData.length; i++) {
+            if (i < 26) {
+                upData.push('-');
+            } else {
+                var num = maData[i] + (2 * mdData[i]);
+                upData.push(num);
+            }
+        }
+        //console.log(upData);
+        return upData;
+    }
+    //计算down的点
+    var downData = [];
+    function setDown() {
+
+        var mdData = getMd();
+        var maData = calculateMA(26);
+        downData = [];
+        for (var i = 0; i < mdData.length; i++) {
+            if (i < 26) {
+                downData.push('-');
+            } else {
+                var num = maData[i] - (2 * mdData[i]);
+                downData.push(num);
+            }
+        }
+
+        return downData;
+    }
+
+    function getServerData() {
+        //第一次获取数据
+        $.ajax({
+            type: "get",
+            url: "/api/Stock/get1Today",
+            async: true,
+            success: function (res) {
+
+
+                data0 = {
+                    categoryData: [
+                        [""]
+                    ],
+                    values: [
+                        ["", "", "", ""]
+                    ]
+                };
+
+                var needData = res.data; //从后台获取需要的数据  	
+                //          data0.values.splice(0,1);
+                //          data0.categoryData.splice(0,1);
+                for (var i = 0; i < needData.length; i++) {
+                    var num = needData[i].data.date.indexOf("T");
+                    var time = needData[i].data.date.substring(num + 1, num + 6); //时间
+                    needData[i].date = time;
+                    data0.categoryData.push(needData[i].date);
+                    data0.values.push([needData[i].data.begin, needData[i].data.end, needData[i].data.low, needData[i].data.high])
+                }
+
+
+                var nn = new Date(needData[needData.length - 1].data.date.replace("T", " "));
+                nn.setMinutes(nn.getMinutes() + 1);
+                var nowdateStr = (100 + nn.getHours()).toString().substr(1, 2) + ":" + (100 + nn.getMinutes()).toString().substr(1, 2);
+                data0.values.push([needData[needData.length - 1].data.begin, needData[needData.length - 1].data.end, needData[needData.length - 1].data.low, needData[needData.length - 1].data.high]);
+                data0.categoryData.push(nowdateStr);
+                //console.log(data0);
+                var minute = nn.getMinutes();
+                for (var i = 1; i <= 3; i++) {
+                    minute = minute + 1;
+                    nn.setMinutes(minute);
+                    var nowdateStr1 = (100 + nn.getHours()).toString().substr(1, 2) + ":" + (100 + nn.getMinutes()).toString().substr(1, 2);
+                    data0.categoryData.push(nowdateStr1);
+                }
+
+                calculateboll();
+                option.xAxis.data = data0.categoryData;
+                option.series[0].data = data0.values;
+
+                myChart.setOption(option);
+
+                loaded = true;
+                kclosed = true;
+            }
+        });
+    }
+    getServerData();
+    //2秒提交的数据暂时注释
+    window.setInterval(function () {
+        getServerData();
+
+    }, 120000);
+
+    //获取每个月结盘的点
+    function getCloseData() {
+        var values = this.data0.values;
+        var closeData1 = this.data0.values[values.length - 1];
+        var closeData = closeData1[1];
+        return closeData;
+    }
+    var option = {
+        backgroundColor: '#21202D',
+        legend: {
+
+            inactiveColor: '#777',
+            textStyle: {
+                color: '#fff'
+            }
+        },
+        tooltip: {
+            trigger: 'axis',
+            axisPointer: {
+                animation: false,
+                type: 'cross',
+                lineStyle: {
+                    color: '#376df4',
+                    width: 2,
+                    opacity: 1
+                }
+            }
+        },
+        xAxis: {
+            type: 'category',
+            data: data0.categoryData,
+            axisLine: { lineStyle: { color: '#8392A5' } }
+        },
+        yAxis: {
+            scale: true,
+            axisLine: { lineStyle: { color: '#8392A5' } },
+            splitLine: { show: false },
+            position: "right"
+        },
+        grid: {
+            bottom: 70,
+            left: 20,
+            right: 70,
+            top: 0
+        },
+        dataZoom: [{
+
+            textStyle: {
+                color: '#8392A5'
+            },
+            handleIcon: 'M10.7,11.9v-1.3H9.3v1.3c-4.9,0.3-8.8,4.4-8.8,9.4c0,5,3.9,9.1,8.8,9.4v1.3h1.3v-1.3c4.9-0.3,8.8-4.4,8.8-9.4C19.5,16.3,15.6,12.2,10.7,11.9z M13.3,24.4H6.7V23h6.6V24.4z M13.3,19.6H6.7v-1.4h6.6V19.6z',
+            handleSize: '80%',
+            dataBackground: {
+                areaStyle: {
+                    color: '#8392A5'
+                },
+                lineStyle: {
+                    opacity: 0.8,
+                    color: '#8392A5'
+                }
+            },
+            handleStyle: {
+                color: '#fff',
+                shadowBlur: 3,
+                shadowColor: 'rgba(0, 0, 0, 0.6)',
+                shadowOffsetX: 2,
+                shadowOffsetY: 2
+            }
+        }, {
+            type: 'inside'
+        }],
+        animation: false,
+        series: [
+            {
+                type: 'candlestick',
+                name: '5分钟',
+                data: data0.values,
+                itemStyle: {
+                    normal: {
+                        color: '#FF4500',//#FD1050',
+                        color0: '#00FF00',
+                        borderColor: '#FD1050',
+                        borderColor0: '#0CF49B'
+                    }
+                },
+                markLine: {
+                    silent: true,
+                    data: [{
+                        yAxis: this.getCloseData() //图表内的虚线
+                    }]
+                }
+            },
+            {
+                name: 'MA5',
+                type: 'line',
+                data: calculateMA(5),
+                 symbolSize:0,
+                smooth: true,
+                lineStyle: {
+                    normal: { opacity: 0.5 }
+                }
+            },
+            {
+                name: 'Up',
+                type: 'line',
+                 symbolSize:0,
+                data: upData,
+                smooth: true,
+            }, {
+                name: "Down",
+                 symbolSize:0,
+                type: "line",
+                data: downData,
+                smooth: true,
+            }
+        ]
+
+    };
+
+    function calculateboll() {
+        getMd();
+        upData = setUp();
+        downData = setDown();
+        //           console.log(upData);
+        option.series[0].markLine.data[0].yAxis = getCloseData();
+        option.series[1].data = calculateMA(26);
+        option.series[2].data = upData;
+        option.series[3].data = downData;
+    }
+
+    function newk(json) {
+
+        // 转时间
+        json.dtdate = json.dtdate.replace("T", " ");
+        var nowdate = new Date(json.dtdate);
+        if (nowdate.getMilliseconds() > 0)
+            nowdate.setMinutes(nowdate.getMinutes() + 1);
+
+        var nowdateStr = (100 + nowdate.getHours()).toString().substr(1, 2) + ":" + (100 + nowdate.getMinutes()).toString().substr(1, 2);
+
+        var tt = 0;
+        for (tt = data0.categoryData.length - 1; tt > -1; tt--) {
+            if (data0.categoryData[tt] == nowdateStr) {
+                // 找到对应的k线，把后面的都删除
+                data0.categoryData = data0.categoryData.slice(0, tt + 1)
+                if (tt > data0.values.length)
+                    // 如果到到的k线位置大于数据的数量就推进去
+                    data0.values.push([json.nextbegin, json.nextend, json.nextlow, json.nexthigh]);
+                else {
+                    data0.values[tt] = [json.nextbegin, json.nextend, json.nextlow, json.nexthigh];
+                    // 后面的删除
+                    data0.values = data0.values.slice(0, tt + 1)
+                }
+
+                // 改写前一个k线
+                data0.values[data0.values.length - 2] = [json.begin, json.end, json.low, json.high];
+                break;
+            }
+        }
+
+        // 找不到对应的K线
+        if (tt == 0) {
+            data0.categoryData.push(nowdateStr);
+            data0.values.push([json.nextbegin, json.nextend, json.nextlow, json.nexthigh]);
+        }
+        // 添加3条
+        for (var i = 1; i <= 3; i++) {
+            nowdate.setMinutes(nowdate.getMinutes() + 1);
+            var nowdateStr = (100 + nowdate.getHours()).toString().substr(1, 2) + ":" + (100 + nowdate.getMinutes()).toString().substr(1, 2);
+            data0.categoryData.push(nowdateStr);
+        }
+
+        calculateboll();
+
+        option.xAxis.data = data0.categoryData;
+        option.series[0].data = data0.values;
+
+        myChart.setOption(option);
+
+    }
+
+    function pushm(json) {
+        // if (loaded == false)
+        // { return; }
+        // if (data0.values.length == 0) {
+        //     newk(json);
+        //     return;
+        // }
+        // json.dtdate = json.dtdate.replace("T", " ");
+        // var nowdate = new Date(json.dtdate);
+        // if (nowdate.getMilliseconds() > 0 || nowdate.getSeconds() > 0)
+        //     nowdate.setMinutes(nowdate.getMinutes() + 1);
+
+        // if (nowdate.getMinutes() % 5 > 0) {
+        //     nowdate.setMinutes(nowdate.getMinutes() + 5 - nowdate.getMinutes() % 5);
+        // }
+        // else {
+        //     nowdate.setMinutes(nowdate.getMinutes() + 5);
+        // }
+        // var nowdateStr = (100 + nowdate.getHours()).toString().substr(1, 2) + ":" + (100 + nowdate.getMinutes()).toString().substr(1, 2);
+
+        // if (data0.categoryData.length > 0 && data0.categoryData[data0.values.length - 1] == nowdateStr) {
+        //     var d = data0.values[data0.values.length - 1];
+
+        data0.values[data0.values.length - 1] = [json.nextbegin, json.nextend, json.nextlow, json.nexthigh];
+        // }
+
+        // if (data0.categoryData[data0.values.length - 1] != nowdateStr) {
+        //     //alert("pushm" + nowdate.getHours() + "datalength:" + data0.values.length.toString() + "nowdateStr:" + nowdateStr + "data0.categoryData[data0.values.length - 1]:" + data0.categoryData[data0.values.length - 1]);
+        //     data0.values.push([json.nextbegin, json.nextend, json.nextlow, json.nexthigh]);
+        //     data0.categoryData.push(nowdateStr);
+
+        // }
+
+        // if (data0.values.length > 1) {
+        //     data0.values[data0.values.length - 2] = [json.begin, json.end, json.low, json.high];
+        // }
+
+        option.xAxis.data = data0.categoryData;
+        option.series[0].data = data0.values;
+        var nowVale = data0.values[data0.values.length - 1]; //获取当前加载这条的数据（开盘数据，收盘数据，最好点数据，最低点数据）
+        option.series[0].markLine.data[0].yAxis = nowVale[1].toFixed(3);
+        myChart.setOption(option);
+
+        return true;
+    }
+
+    function push5(json) {
+        // var num = json.date.indexOf("T");
+        // var time = json.date.substring(num + 1, num + 6); //时间
+
+
+
+        //data0.values[data0.values.length -1] = [json.begin, json.end, json.low, json.high];
+
+        // var nowdate = new Date(json.dtdate);
+        // var nowdateStr = (100 + nowdate.getHours()).toString().substr(1, 2) + ":" + (100 + nowdate.getMinutes()).toString().substr(1, 2);
+        // var i = 0;
+        // for (var i = data0.categoryData.length - 1; i > 0; i--) {
+        //     date = data0.categoryData[i];
+        //     if (date == nowdateStr) {
+        //         data0.values[i] = [json.begin, json.end, json.low, json.high];
+        //         break;
+        //     }
+        // }
+
+        // if (i == 0) {
+        //     alert(json.dtdate);
+        //     data0.values.push([json.begin, json.end, json.low, json.high]);
+        //     data0.categoryData.push(nowdateStr);
+        // }
+
+
+        // // if ($.inArray(time, data0.categoryData) > -1) {
+        // //     // 写最后一跟柱台为五分钟值
+        // //     if (data0.values.length > 0) {
+        // //         data0.values[data0.values.length - 1] = [json.begin, json.end, json.low, json.high];
+        // //     }
+        // // }
+        // // else {
+
+        // //     data0.values.push([json.begin, json.end, json.low, json.high]);
+        // //     data0.categoryData.push(time);
+        // // }
+
+        // option.series[0].data = data0.values;
+
+        // myChart.setOption(option);
+
+        // kclosed = true;
+    }
+
+    //浏览器大小改变时重置大小
+    //用于使chart自适应高度和宽度
+    window.onresize = function () {
+        //重置容器高宽
+        resizeWorldMapContainer();
+        myChart.resize();
+    };
+
+</script>
+
+</html>
